@@ -2,6 +2,8 @@ import random
 
 import numpy as np
 
+from collections import deque
+
 from abc import ABC, abstractmethod
 
 
@@ -48,20 +50,21 @@ class Altruist(Agent):
         super().__init__()
 
         # variance of price, range [0, 1.0], higher --> greater deviation from market price
-        self.d = random.uniform(0.1, 0.5)
+        self.d = 0.1 * np.random.normal(0.05, 0.05)
 
         # determines proportion of wealth to use for transaction
-        self.b = 0.2
+        self.b = 0.1
 
     def make_transactions(self, price):
         ''' randomly makes transactions for daily use '''
         super().make_transactions(price)
 
-        c = random.randint(0, 12)
-        if c < 5: # buy
+        c = random.randint(0, 500)
+
+        if c == 5: # buy
 
             # get desired transaction price
-            p_t = price + random.uniform(-0.5 * self.d * price, 0.8 * self.d * price)
+            p_t = price + random.uniform(-2.0 * self.d * price, 2.0 * self.d * price)
 
             # proportion of wealth to use
             proportion = self.b + random.uniform(-0.05 * self.d, 0.1 * self.d)
@@ -73,10 +76,10 @@ class Altruist(Agent):
                 # 0 is buy
                 return (0, p_t, q_t)
 
-        elif c < 10: # sell
+        elif c == 10: # sell
 
             # get desired transaction price
-            p_t = price + random.uniform(-0.8 * self.d * price, 0.5 * self.d * price)
+            p_t = price + random.uniform(-0.9 * self.d * price, 0.5 * self.d * price)
 
             # proportion of wealth to use
             proportion = self.b + random.uniform(-0.1 * self.d, 0.05 * self.d)
@@ -102,7 +105,7 @@ class Miner(Agent):
         super().__init__()
 
         # variance of price, range [0, 1.0], higher --> greater deviation from market price
-        self.d = 0.0
+        self.d = 0.05
 
         # determines proportion of wealth to use for transaction
         self.b = 0.2
@@ -115,13 +118,13 @@ class Miner(Agent):
 
         super().make_transactions(price)
 
-        c = random.randint(0, 12)
+        c = random.randint(0, 30)
 
         # miners have a lot less incentive to buy
-        if c < 2: # buy
+        if c < 0: # buy
 
             # get desired transaction price
-            p_t = price + random.uniform(-0.5 * self.d * price, 0.8 * self.d * price)
+            p_t = price + random.uniform(-0.5 * self.d * price, 0.2 * self.d * price)
 
             # proportion of wealth to use
             proportion = self.b + random.uniform(-0.05 * self.d, 0.1 * self.d)
@@ -134,10 +137,10 @@ class Miner(Agent):
                 return (0, p_t, q_t)
 
         # tendency to sell bitcoin and cashout
-        elif c < 10: # sell
+        elif c < 25: # sell
 
             # get desired transaction price
-            p_t = price + random.uniform(-0.8 * self.d * price, 0.5 * self.d * price)
+            p_t = price + random.uniform(-0.8 * self.d * price, 0.2 * self.d * price)
 
             # proportion of wealth to use
             proportion = self.b + random.uniform(-0.1 * self.d, 0.05 * self.d)
@@ -164,23 +167,41 @@ class Speculator(Agent):
         super().__init__()
 
         # variance of price, range [0, 1.0], higher --> greater deviation from market price
-        self.d = random.uniform(0.2, 0.8)
+        self.d = abs(np.random.normal(1, 0.5))
 
         # determines proportion of wealth to use for transaction
-        self.b = 0.2
+        self.b = 0.1
 
         # compares price to previous price
-        self.p_prev = 0
+        self.p_prev = 0.001
+
+        # speculators take into account price variation history
+        self.interval = 1 + int(np.abs(np.random.normal(3, 1.5)))
+        self.history = deque(maxlen = self.interval)
+
+        # prefill history
+        for _ in range(self.interval):
+            self.history.append(8)
+
+        # price variation lowerbound, buy/sell depending on price variance vs tolerance
+        self.lower = np.random.normal(1.01, 0.05)
+
+        # price variation upperbound, buy/sell depending on price variance vs tolerance
+        self.upper = np.random.normal(1.2, 0.08)
 
     def make_transactions(self, price):
         ''' buys when prices go up, sells when prices go down '''
 
         super().make_transactions(price)
 
-        c = random.randint(0, 9)
+        # introduce randomness to account for other factors
+        c = random.randint(0, 50)
 
-        # miners have a lot less incentive to buy
-        if c < 7 and price > self.p_prev: # buy
+        # price variance
+        ratio = price / self.history[0]
+
+        # speculators take into account how price has changed in short term
+        if c < 5 and ((self.upper > ratio > self.lower) or (1 / ratio < 0.9)): # price has increased a lot, we buy
 
             # get desired transaction price
             p_t = price + random.uniform(-0.2 * self.d * price, 0.8 * self.d * price)
@@ -191,17 +212,18 @@ class Speculator(Agent):
             # quantity of bitcoin
             q_t = int((proportion * self.capital) / p_t)
 
-            self.p_prev = price
+            #self.p_prev = price
 
             if q_t > 0:
+                self.history.append(price)
                 # 0 is buy
                 return (0, p_t, q_t)
 
-        # tendency to sell bitcoin and cashout
-        elif c < 7 and price < self.p_prev: # sell
+        # tendency to sell bitcoin and cashout if prices are not growing fast enough
+        elif c < 5: # sell either because price is falling or has made enough
 
             # get desired transaction price
-            p_t = price + random.uniform(-0.8 * self.d * price, 0.2 * self.d * price)
+            p_t = price + random.uniform(-8.9 * self.d * price, 0.1 * self.d * price)
 
             # proportion of wealth to use
             proportion = self.b + random.uniform(-0.1 * self.d, 0.05 * self.d)
@@ -209,11 +231,15 @@ class Speculator(Agent):
             # quantity of bitcoins to use
             q_t = int((proportion * self.bitcoins))
 
-            self.p_prev = price
+            #self.p_prev = price
 
             if q_t > 0:
+                self.history.append(price)
+
                 # 1 is sell
                 return (1, p_t, q_t)
+
+        self.history.append(price)
 
         # no trade
         return (-1, 0, 0)

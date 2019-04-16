@@ -1,8 +1,11 @@
 import bisect, random
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from Agent import Altruist, Miner, Speculator
+
+TIMESTEPS = 500
 
 class Blockchain():
     ''' performs a simulation of a blockchain economy '''
@@ -29,7 +32,7 @@ class Blockchain():
         # miner agents on the blockchain
         self.miners = []
 
-    def run(self, timesteps = 5):
+    def run(self, timesteps = TIMESTEPS):
         '''
         runs the simulation
         '''
@@ -58,11 +61,12 @@ class Blockchain():
         '''
 
         # new miners
-        self.miners += [Miner() for _ in range(random.randint(2, 10))]
+        self.miners += [Miner() for _ in range(1 + int(np.abs(np.random.normal(1, 1))))]
 
         # altruists
-        self.population += [Altruist() for _ in range(random.randint(2, 10))]
+        self.population += [Altruist() for _ in range(np.abs(int(np.random.normal(2, 2))))]
 
+        # TODO add hoarding effect
         # new speculators
         self.population += [Speculator() for _ in range(random.randint(2, 10))]
 
@@ -74,6 +78,7 @@ class Blockchain():
 
         return sum([miner.hashpow for miner in self.miners])
 
+    # TODO add pooling
     def mine(self):
         '''
         miners mine for blocks by randomly selecting winner based on proportional hashpower
@@ -121,16 +126,23 @@ class Blockchain():
         performs transactions by matching buy and sell orders
         '''
 
+        print(self.buy)
+        print(self.sell)
+
         # buy list is reversed
         i = len(self.buy) - 1
 
         j = 0
+
+        transaction = False
 
         while i >= 0 and j < len(self.sell):
             p_b, q_b, buyer = self.buy[i]
             p_s, q_s, seller = self.sell[j]
 
             if p_b >= p_s: # hit! make transaction
+
+                transaction = True
 
                 # use the lesser quantity
                 q_t = min(q_b, q_s)
@@ -161,16 +173,24 @@ class Blockchain():
                 self.price = p_b
 
             else: # no hits left, go to next time step
+
+                # market crashing...
+                if not transaction:
+                    self.price = p_s
+
                 break
 
         # update order lists
-        self.buy = self.buy[i:]
-        self.sell = self.sell[j:]
+        self.buy = []#self.buy[i:]
+        self.sell = []#self.sell[j:]
         self.p_hist.append(self.price)
-        print(self.price)
+        print('\n', self.curr_step, ") Price: ", self.price, "\n")
 
 
 x = Blockchain()
 x.run()
+
+plt.plot(x.p_hist, '-')
+plt.show()
 
 
