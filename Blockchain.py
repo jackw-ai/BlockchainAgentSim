@@ -52,7 +52,6 @@ class Blockchain():
 
         self.resolve_transactions()
 
-    # TODO
     def new_agents(self):
         '''
         new agents come into the blockchain
@@ -92,8 +91,6 @@ class Blockchain():
         # winner gains newly minted coins
         winner.bitcoins += 100
 
-
-    # TODO
     def get_transactions(self):
         '''
         adds transactions to the order lists
@@ -139,12 +136,17 @@ class Blockchain():
                 q_t = min(q_b, q_s)
                 q_b -= q_t
                 q_s -= q_t
-                print(buyer)
+
+                print("---transaction---")
+                print(buyer, '|||||', seller)
                 print(q_t, '    ', p_b)
+
                 # update buyer and seller wallets
                 buyer.capital_to_coins(q_t, p_b)
                 seller.coins_to_capital(q_t, p_b)
-                print(buyer)
+
+                print(buyer, '|||||', seller)
+
                 if q_b == 0: # all bought, move on
                     i -= 1
                 else: # update residual quantity

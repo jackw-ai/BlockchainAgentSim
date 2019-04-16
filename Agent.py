@@ -4,7 +4,6 @@ import numpy as np
 
 from abc import ABC, abstractmethod
 
-TYPES = ['S', 'A', 'M']
 
 class Agent(ABC):
     ''' abstract agent class '''
@@ -24,10 +23,6 @@ class Agent(ABC):
         '''
         pass
 
-    def tx_price(self, market_price):
-        ''' returns transaction price given market price (added noise to pricing) '''
-        pass
-
     def coins_to_capital(self, q, p):
         ''' turns capital to bitcoins '''
         self.capital += q * p
@@ -39,6 +34,7 @@ class Agent(ABC):
         self.bitcoins += q
 
     def __lt__(self, other):
+        ''' prevent sorting issues '''
         return True
 
     @abstractmethod
@@ -59,7 +55,6 @@ class Altruist(Agent):
 
     def make_transactions(self, price):
         ''' randomly makes transactions for daily use '''
-
         super().make_transactions(price)
 
         c = random.randint(0, 12)
@@ -99,7 +94,6 @@ class Altruist(Agent):
     def __str__(self):
         super().__str__()
         return '(altruist, coins %d, capital %d)' %(self.bitcoins, self.capital)
-
 
 class Miner(Agent):
     ''' A Miner agent uses the blockchain to mine for profit '''
@@ -186,7 +180,7 @@ class Speculator(Agent):
         c = random.randint(0, 9)
 
         # miners have a lot less incentive to buy
-        if c < 5 and price > self.p_prev: # buy
+        if c < 7 and price > self.p_prev: # buy
 
             # get desired transaction price
             p_t = price + random.uniform(-0.2 * self.d * price, 0.8 * self.d * price)
@@ -204,7 +198,7 @@ class Speculator(Agent):
                 return (0, p_t, q_t)
 
         # tendency to sell bitcoin and cashout
-        elif c > 4 and price < self.p_prev: # sell
+        elif c < 7 and price < self.p_prev: # sell
 
             # get desired transaction price
             p_t = price + random.uniform(-0.8 * self.d * price, 0.2 * self.d * price)
