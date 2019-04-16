@@ -1,9 +1,11 @@
 import bisect, random
 
-from Agent import Altruist
+import numpy as np
+
+from Agent import Altruist, Miner, Speculator
 
 class Blockchain():
-
+    ''' performs a simulation of a blockchain economy '''
     def __init__(self, coins = 10000):
 
         # total number of coins
@@ -27,11 +29,10 @@ class Blockchain():
         # miner agents on the blockchain
         self.miners = []
 
-    def run(self, timesteps = 10):
+    def run(self, timesteps = 5):
         '''
         runs the simulation
         '''
-
 
         print('starting simulation for %d timesteps...' %timesteps)
 
@@ -58,18 +59,39 @@ class Blockchain():
         '''
 
         # new miners
-
-        # new speculators
+        self.miners += [Miner() for _ in range(random.randint(2, 10))]
 
         # altruists
         self.population += [Altruist() for _ in range(random.randint(2, 10))]
 
-    # TODO
+        # new speculators
+        self.population += [Speculator() for _ in range(random.randint(2, 10))]
+
+    @property
+    def total_hashpow(self):
+        '''
+        :return: total mining power
+        '''
+
+        return sum([miner.hashpow for miner in self.miners])
+
     def mine(self):
         '''
-        miners mine for blocks
+        miners mine for blocks by randomly selecting winner based on proportional hashpower
         '''
-        self.coins += 100
+
+        # total hashpower
+        thp = self.total_hashpow
+
+        # probablity of mining next block
+        probs = [miner.hashpow / thp for miner in self.miners]
+
+        # select winner
+        winner = np.random.choice(self.miners, p=probs)
+
+        # winner gains newly minted coins
+        winner.bitcoins += 100
+
 
     # TODO
     def get_transactions(self):
@@ -78,13 +100,23 @@ class Blockchain():
         '''
 
         # miners make transactions
+        for agent in self.miners:
+            b, p, q = agent.make_transactions(self.price)
+
+            if b == 0:  # buy
+                # use bisect to insert into sorted list
+                bisect.insort(self.buy, (p, q, agent))
+            elif b == 1:  # sell
+                bisect.insort(self.sell, (p, q, agent))
+
+        # agents make transactions
         for agent in self.population:
             b, p, q = agent.make_transactions(self.price)
 
-            if b == 0:
+            if b == 0: # buy
                 # use bisect to insert into sorted list
                 bisect.insort(self.buy, (p, q, agent))
-            else:
+            elif b == 1: # sell
                 bisect.insort(self.sell, (p, q, agent))
 
     def resolve_transactions(self):
@@ -107,11 +139,12 @@ class Blockchain():
                 q_t = min(q_b, q_s)
                 q_b -= q_t
                 q_s -= q_t
-
-                # update buyler and seller wallets
+                print(buyer)
+                print(q_t, '    ', p_b)
+                # update buyer and seller wallets
                 buyer.capital_to_coins(q_t, p_b)
                 seller.coins_to_capital(q_t, p_b)
-
+                print(buyer)
                 if q_b == 0: # all bought, move on
                     i -= 1
                 else: # update residual quantity
