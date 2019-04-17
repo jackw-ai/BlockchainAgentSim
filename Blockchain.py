@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from Agent import Altruist, Miner, Speculator
 
-TIMESTEPS = 500
+TIMESTEPS = 300
 
 class Blockchain():
     ''' performs a simulation of a blockchain economy '''
@@ -14,8 +14,14 @@ class Blockchain():
         # total number of coins
         self.coins = coins
 
-        # current price
+        # current price, starts at 10
         self.price = 10
+
+        # whether spectators hoard (more come in when prices increase)
+        self.hoard = True
+
+        # whether miners continue to increase hashpower
+        self.pool = True
 
         self.p_hist = []
 
@@ -61,14 +67,37 @@ class Blockchain():
         '''
 
         # new miners
-        self.miners += [Miner() for _ in range(1 + int(np.abs(np.random.normal(1, 1))))]
+        self.miners += [Miner() for _ in range(1 + int(np.abs(np.random.normal(3, 1))))]
 
         # altruists
-        self.population += [Altruist() for _ in range(np.abs(int(np.random.normal(2, 2))))]
+        self.population += [Altruist() for _ in range(np.abs(int(np.random.normal(10, 2))))]
 
-        # TODO add hoarding effect
-        # new speculators
-        self.population += [Speculator() for _ in range(random.randint(2, 10))]
+        # use consecutive price hikes to account for hoarding effect
+        n = self.consec_growth()
+
+        # more spectators likely to hoard in the more consecutive price hikes
+        self.population += [Speculator() for _ in range(random.randint(0, n**2))]
+
+    @property
+    def block_reward(self):
+        ''' block reward steadily decreases '''
+        return 100.0 / (self.curr_step**0.1)
+
+    def consec_growth(self):
+        ''' count number of consecutive price hikes starting from latest price'''
+
+        if not self.hoard:
+            # if not hoarding, spectators enter uniformly random
+            return 4
+
+        c = 0
+
+        for i in reversed(range(1, len(self.p_hist))):
+            if self.p_hist[i] > self.p_hist[i - 1]:
+                c += 1
+            else:
+                break
+        return c
 
     @property
     def total_hashpow(self):
@@ -78,7 +107,19 @@ class Blockchain():
 
         return sum([miner.hashpow for miner in self.miners])
 
-    # TODO add pooling
+    def plot_miners(self):
+        ''' plot miner proportion '''
+        thp = self.total_hashpow
+        pies = [miner.hashpow / thp for miner in self.miners]
+        pies.sort()
+        plt.pie(pies)
+        plt.show()
+
+    def plot_price(self):
+        ''' plot price history '''
+        plt.plot(self.p_hist, '-')
+        plt.show()
+
     def mine(self):
         '''
         miners mine for blocks by randomly selecting winner based on proportional hashpower
@@ -94,7 +135,7 @@ class Blockchain():
         winner = np.random.choice(self.miners, p=probs)
 
         # winner gains newly minted coins
-        winner.bitcoins += 100
+        winner.bitcoins += self.block_reward
 
     def get_transactions(self):
         '''
@@ -103,6 +144,11 @@ class Blockchain():
 
         # miners make transactions
         for agent in self.miners:
+
+            if self.pool:
+                # decide whether to upgrade equipment
+                agent.assess_equipment()
+
             b, p, q = agent.make_transactions(self.price)
 
             if b == 0:  # buy
@@ -189,8 +235,8 @@ class Blockchain():
 
 x = Blockchain()
 x.run()
+x.plot_miners()
+x.plot_price()
 
-plt.plot(x.p_hist, '-')
-plt.show()
 
 

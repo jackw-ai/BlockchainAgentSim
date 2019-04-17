@@ -12,7 +12,9 @@ class Agent(ABC):
 
     def __init__(self):
         super().__init__()
-        self.capital = random.randint(1000, 1000000)
+
+        # wealth follows a lognormal (right skewed) distribution
+        self.capital = np.random.lognormal(1, 2) * 10000 #random.randint(1000, 1000000)
         self.bitcoins = 0
 
     @abstractmethod
@@ -61,7 +63,7 @@ class Altruist(Agent):
 
         c = random.randint(0, 500)
 
-        if c == 5: # buy
+        if c < 5: # buy
 
             # get desired transaction price
             p_t = price + random.uniform(-2.0 * self.d * price, 2.0 * self.d * price)
@@ -76,7 +78,7 @@ class Altruist(Agent):
                 # 0 is buy
                 return (0, p_t, q_t)
 
-        elif c == 10: # sell
+        elif c < 10: # sell
 
             # get desired transaction price
             p_t = price + random.uniform(-0.9 * self.d * price, 0.5 * self.d * price)
@@ -108,7 +110,10 @@ class Miner(Agent):
         self.d = 0.05
 
         # determines proportion of wealth to use for transaction
-        self.b = 0.2
+        self.b = 0.3
+
+        # investment rate
+        self.g = 0.1
 
         # mining power
         self.hashpow = random.uniform(10, 150)
@@ -124,7 +129,7 @@ class Miner(Agent):
         if c < 0: # buy
 
             # get desired transaction price
-            p_t = price + random.uniform(-0.5 * self.d * price, 0.2 * self.d * price)
+            p_t = price + random.uniform(-0.5 * self.d * price, 0.5 * self.d * price)
 
             # proportion of wealth to use
             proportion = self.b + random.uniform(-0.05 * self.d, 0.1 * self.d)
@@ -154,6 +159,22 @@ class Miner(Agent):
 
         # no trade
         return (-1, 0, 0)
+
+    def assess_equipment(self):
+        ''' determines whether to invest in new equipment and increase hashpower'''
+        buy = random.uniform(0, 500)
+
+        if buy < 10: # invest in new equipment
+            # resources to invest
+            resources = self.capital * self.g
+            self.capital -= resources
+            self.hashpow = self.get_hashpow(resources, self.hashpow)
+
+
+    @staticmethod
+    def get_hashpow(resources, curr_hashpow):
+        ''' determine hashpower based on resources'''
+        return resources**2 * 0.54 + curr_hashpow
 
     def __str__(self):
         super().__str__()
@@ -187,7 +208,7 @@ class Speculator(Agent):
         self.lower = np.random.normal(1.01, 0.05)
 
         # price variation upperbound, buy/sell depending on price variance vs tolerance
-        self.upper = np.random.normal(1.2, 0.08)
+        self.upper = np.random.normal(1.6, 0.2)
 
     def make_transactions(self, price):
         ''' buys when prices go up, sells when prices go down '''
@@ -195,7 +216,7 @@ class Speculator(Agent):
         super().make_transactions(price)
 
         # introduce randomness to account for other factors
-        c = random.randint(0, 50)
+        c = random.randint(0, 10)
 
         # price variance
         ratio = price / self.history[0]
@@ -247,7 +268,3 @@ class Speculator(Agent):
     def __str__(self):
         super().__str__()
         return '(speculator, coins %d, capital %d)' %(self.bitcoins, self.capital)
-
-
-
-
