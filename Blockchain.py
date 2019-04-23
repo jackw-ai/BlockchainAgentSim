@@ -84,6 +84,27 @@ class Blockchain():
 
 		self.resolve_transactions()
 
+		self.exit_agents()
+
+	def exit_agents(self):
+		def exit(a):
+			return (a.capital_current/a.capital_original) < (1-a.loss_tolerance)
+
+		# if exceeds loss_tolerance, agent quits simulation
+		# also update agent counts
+		self.altruists = [agent for agent in self.altruists if not exit(agent)]
+		self.altruist_counts[-1] = len(self.altruists)
+		# for agent in self.altruists:
+		# 	if exit(agent):
+		# 		self.altruists.remove(agent)
+		# 		self.altruist_counts[-1] -= 1
+
+		self.speculators = [agent for agent in self.speculators if not exit(agent)]
+		self.speculator_counts[-1] = len(self.speculators)
+
+		self.miners = [agent for agent in self.miners if not exit(agent)]
+		self.miner_counts[-1] = len(self.miners)
+
 	def new_agents(self):
 		'''
 		new agents come into the blockchain
@@ -290,7 +311,7 @@ class Blockchain():
 		plt.title("number of agents over time")
 		plt.show()
 
-	def bitcoin_holding_history
+	# def bitcoin_holding_history()
 
 	# call all plotting here, comment out ones not needed
 	def plots(self):

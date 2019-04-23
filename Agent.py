@@ -16,7 +16,7 @@ class Agent(ABC):
 		# wealth follows a lognormal (right skewed) distribution
 		# self.capital = np.random.lognormal(1, 2) * 10000 #random.randint(1000, 1000000)
 		self.bitcoins = 0
-		# self.loss_tolerance = 0.2
+		self.loss_tolerance = 0.2 # original capital/current capital >= 1-loss_tolerance
 
 	@abstractmethod
 	def make_transactions(self, price):
@@ -30,12 +30,12 @@ class Agent(ABC):
 
 	def coins_to_capital(self, q, p):
 		''' turns capital to bitcoins '''
-		self.capital += q * p
+		self.capital_current += q * p
 		self.bitcoins -= q
 
 	def capital_to_coins(self, q, p):
 		''' turns bitcoins to capital '''
-		self.capital -= q * p
+		self.capital_current -= q * p
 		self.bitcoins += q
 
 	def __lt__(self, other):
@@ -52,7 +52,8 @@ class Altruist(Agent):
 	def __init__(self, capital):
 		super().__init__()
 
-		self.capital = capital
+		self.capital_original = capital
+		self.capital_current = capital
 
 		# variance of price, range [0, 1.0], higher --> greater deviation from market price
 		self.d = 0.1 * np.random.normal(0.05, 0.05)
@@ -75,7 +76,7 @@ class Altruist(Agent):
 			proportion = self.b + random.uniform(-0.05 * self.d, 0.1 * self.d)
 
 			# quantity of bitcoin
-			q_t = int((proportion * self.capital) / p_t)
+			q_t = int((proportion * self.capital_current) / p_t)
 
 			if q_t > 0:
 				# 0 is buy
@@ -101,7 +102,7 @@ class Altruist(Agent):
 
 	def __str__(self):
 		super().__str__()
-		return '(altruist, coins %d, capital %d)' %(self.bitcoins, self.capital)
+		return '(altruist, coins %d, capital %d)' %(self.bitcoins, self.capital_current)
 
 class Miner(Agent):
 	''' A Miner agent uses the blockchain to mine for profit '''
@@ -109,7 +110,8 @@ class Miner(Agent):
 	def __init__(self, capital):
 		super().__init__()
 
-		self.capital = capital
+		self.capital_original = capital
+		self.capital_current = capital
 
 		# variance of price, range [0, 1.0], higher --> greater deviation from market price
 		self.d = 0.05
@@ -140,7 +142,7 @@ class Miner(Agent):
 			proportion = self.b + random.uniform(-0.05 * self.d, 0.1 * self.d)
 
 			# quantity of bitcoin
-			q_t = int((proportion * self.capital) / p_t)
+			q_t = int((proportion * self.capital_current) / p_t)
 
 			if q_t > 0:
 				# 0 is buy
@@ -171,8 +173,8 @@ class Miner(Agent):
 
 		if buy < 10: # invest in new equipment
 			# resources to invest
-			resources = self.capital * self.g
-			self.capital -= resources
+			resources = self.capital_current * self.g
+			self.capital_current -= resources
 			self.hashpow = self.get_hashpow(resources, self.hashpow)
 
 
@@ -183,7 +185,7 @@ class Miner(Agent):
 
 	def __str__(self):
 		super().__str__()
-		return '(miner, coins %d, capital %d)' %(self.bitcoins, self.capital)
+		return '(miner, coins %d, capital %d)' %(self.bitcoins, self.capital_current)
 
 
 class Speculator(Agent):
@@ -192,7 +194,8 @@ class Speculator(Agent):
 	def __init__(self, capital):
 		super().__init__()
 
-		self.capital = capital
+		self.capital_original = capital
+		self.capital_current = capital
 
 		# variance of price, range [0, 1.0], higher --> greater deviation from market price
 		self.d = abs(np.random.normal(1, 0.5))
@@ -238,7 +241,7 @@ class Speculator(Agent):
 			proportion = self.b + random.uniform(-0.05 * self.d, 0.1 * self.d)
 
 			# quantity of bitcoin
-			q_t = int((proportion * self.capital) / p_t)
+			q_t = int((proportion * self.capital_current) / p_t)
 
 			#self.p_prev = price
 
@@ -274,4 +277,4 @@ class Speculator(Agent):
 
 	def __str__(self):
 		super().__str__()
-		return '(speculator, coins %d, capital %d)' %(self.bitcoins, self.capital)
+		return '(speculator, coins %d, capital %d)' %(self.bitcoins, self.capital_current)
