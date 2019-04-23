@@ -16,6 +16,7 @@ class Agent(ABC):
 		# wealth follows a lognormal (right skewed) distribution
 		# self.capital = np.random.lognormal(1, 2) * 10000 #random.randint(1000, 1000000)
 		self.bitcoins = 0
+		# self.loss_tolerance = 0.2
 
 	@abstractmethod
 	def make_transactions(self, price):
@@ -130,7 +131,7 @@ class Miner(Agent):
 		c = random.randint(0, 30)
 
 		# miners have a lot less incentive to buy
-		if c < 2: # buy
+		if c < 1: # buy
 
 			# get desired transaction price
 			p_t = price + random.uniform(-0.5 * self.d * price, 0.5 * self.d * price)

@@ -33,10 +33,16 @@ class Blockchain():
 		self.curr_step = 0
 
 		# population of agents (Speculators, Altruists)
-		self.population = []
-
+		# self.population = []
+		self.altruists = []
+		self.speculators = []
 		# miner agents on the blockchain
 		self.miners = []
+
+		# number of agents (actual) at each time step
+		self.miner_counts = []
+		self.altruist_counts = []
+		self.speculator_counts = []
 
 	# generate lists of agents before simulation
 	def generate_agents(self):
@@ -82,19 +88,28 @@ class Blockchain():
 		'''
 		new agents come into the blockchain
 		'''
-		# extract agents from the agent list
 		miner_count = 1 + int(np.abs(np.random.normal(3, 1)))
 		altruist_count = np.abs(int(np.random.normal(10, 2)))
-
 		n = self.consec_growth()
 		speculator_count = random.randint(0, n**2)
 
+		# extract agents from the agent list
 		self.miners += self.available_miners[:miner_count]
-		self.population += self.available_altruists[:altruist_count]
-		self.population += self.available_speculators[:speculator_count]
+		self.altruists += self.available_altruists[:altruist_count]
+		self.speculators += self.available_speculators[:speculator_count]
 		self.available_miners = self.available_miners[miner_count:]
 		self.available_altruists = self.available_altruists[altruist_count:]
 		self.available_speculators = self.available_speculators[speculator_count:]
+
+		# record number of agents currently in the simulation
+		if self.curr_step == 1:
+			self.altruist_counts.append(altruist_count)
+			self.miner_counts.append(miner_count)
+			self.speculator_counts.append(speculator_count)
+		else:
+			self.altruist_counts.append(self.altruist_counts[-1] + altruist_count)
+			self.miner_counts.append(self.miner_counts[-1] + miner_count)
+			self.speculator_counts.append(self.speculator_counts[-1] + speculator_count)
 
 		# # new miners
 		# self.miners += [Miner() for _ in range(1 + int(np.abs(np.random.normal(3, 1))))]
@@ -137,21 +152,6 @@ class Blockchain():
 
 		return sum([miner.hashpow for miner in self.miners])
 
-	def plot_miners(self):
-		''' plot miner proportion '''
-		thp = self.total_hashpow
-		pies = [miner.hashpow / thp for miner in self.miners]
-		pies.sort()
-		plt.pie(pies)
-		plt.title("proportions of miner hash power")
-		plt.show()
-
-	def plot_price(self):
-		''' plot price history '''
-		plt.plot(self.p_hist, '-')
-		plt.title("price history")
-		plt.show()
-
 	def mine(self):
 		'''
 		miners mine for blocks by randomly selecting winner based on proportional hashpower
@@ -190,7 +190,7 @@ class Blockchain():
 				bisect.insort(self.sell, (p, q, agent))
 
 		# agents make transactions
-		for agent in self.population:
+		for agent in self.altruists+self.speculators:
 			b, p, q = agent.make_transactions(self.price)
 
 			if b == 0: # buy
@@ -204,8 +204,8 @@ class Blockchain():
 		performs transactions by matching buy and sell orders
 		'''
 
-		print(self.buy)
-		print(self.sell)
+		# print(self.buy)
+		# print(self.sell)
 
 		# buy list is reversed
 		i = len(self.buy) - 1
@@ -264,8 +264,40 @@ class Blockchain():
 		self.p_hist.append(self.price)
 		print('\n', self.curr_step, ") Price: ", self.price, "\n")
 
+	def hash_power_proportions(self):
+		''' plot miner proportion '''
+		thp = self.total_hashpow
+		pies = [miner.hashpow / thp for miner in self.miners]
+		pies.sort()
+		plt.pie(pies)
+		plt.title("proportions of miner hash power")
+		plt.show()
 
-x = Blockchain()
-x.run()
-x.plot_miners()
-x.plot_price()
+	def price_history(self):
+		''' plot price history '''
+		plt.plot(self.p_hist, '-')
+		plt.xlabel("time steps"); plt.ylabel("price")
+		plt.title("price history")
+		plt.show()
+
+	def num_agents_over_time(self):
+		X = range(TIMESTEPS)
+		plt.plot(X, self.altruist_counts, label="users")
+		plt.plot(X, self.speculator_counts, label="speculators")
+		plt.plot(X, self.miner_counts, label="miners")
+		plt.legend()
+		plt.xlabel("time steps"); plt.ylabel("number of agents")
+		plt.title("number of agents over time")
+		plt.show()
+
+	def bitcoin_holding_history
+
+	# call all plotting here, comment out ones not needed
+	def plots(self):
+		self.price_history()
+		self.hash_power_proportions()
+		self.num_agents_over_time()
+
+chain = Blockchain()
+chain.run()
+chain.plots()
