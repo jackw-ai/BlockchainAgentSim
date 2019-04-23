@@ -8,235 +8,264 @@ from Agent import Altruist, Miner, Speculator
 TIMESTEPS = 300
 
 class Blockchain():
-    ''' performs a simulation of a blockchain economy '''
-    def __init__(self, coins = 10000):
+	''' performs a simulation of a blockchain economy '''
+	def __init__(self, coins = 10000):
 
-        # total number of coins
-        self.coins = coins
+		# total number of coins
+		self.coins = coins
 
-        # current price, starts at 10
-        self.price = 10
+		# current price, starts at 10
+		self.price = 10
 
-        # whether spectators hoard (more come in when prices increase)
-        self.hoard = True
+		# whether spectators hoard (more come in when prices increase)
+		self.hoard = True
 
-        # whether miners continue to increase hashpower
-        self.pool = True
+		# whether miners continue to increase hashpower
+		self.pool = True
 
-        self.p_hist = []
+		self.p_hist = []
 
-        # order lists, contains (p, q, agent)
-        self.sell = []
-        self.buy = []
+		# order lists, contains (p, q, agent)
+		self.sell = []
+		self.buy = []
 
-        # time step in simulation
-        self.curr_step = 0
+		# time step in simulation
+		self.curr_step = 0
 
-        # population of agents (Speculators, Altruists)
-        self.population = []
+		# population of agents (Speculators, Altruists)
+		self.population = []
 
-        # miner agents on the blockchain
-        self.miners = []
+		# miner agents on the blockchain
+		self.miners = []
 
-    def run(self, timesteps = TIMESTEPS):
-        '''
-        runs the simulation
-        '''
+	# generate lists of agents before simulation
+	def generate_agents(self):
 
-        print('starting simulation for %d timesteps...' %timesteps)
+		# available number of agents in each category
+		num_miners = TIMESTEPS * 5
+		num_altruists = TIMESTEPS * 12
+		num_speculators = TIMESTEPS * 20
+		total = num_miners + num_altruists + num_speculators
 
-        for i in range(timesteps):
-            self.step()
+		# pareto wealth distribution; decide on param
+		capitals = np.random.pareto(3, total) * 10000
 
-    def step(self):
-        ''' performs one time step in the simulation '''
+		self.available_miners = [Miner(capitals[i]) for i in range(num_miners)]
+		self.available_altruists = [Altruist(capitals[j]) for j in range(num_miners, num_altruists + num_miners)]
+		self.available_speculators = [Speculator(capitals[k]) for k in range(num_altruists + num_miners, total)]
 
-        self.curr_step += 1
+	def run(self, timesteps = TIMESTEPS):
+		'''
+		runs the simulation
+		'''
+		self.generate_agents()
 
-        self.new_agents()
+		print('starting simulation for %d timesteps...' %timesteps)
 
-        self.mine()
+		for i in range(timesteps):
+			self.step()
 
-        self.get_transactions()
+	def step(self):
+		''' performs one time step in the simulation '''
 
-        self.resolve_transactions()
+		self.curr_step += 1
 
-    def new_agents(self):
-        '''
-        new agents come into the blockchain
-        '''
+		self.new_agents()
 
-        # new miners
-        self.miners += [Miner() for _ in range(1 + int(np.abs(np.random.normal(3, 1))))]
+		self.mine()
 
-        # altruists
-        self.population += [Altruist() for _ in range(np.abs(int(np.random.normal(10, 2))))]
+		self.get_transactions()
 
-        # use consecutive price hikes to account for hoarding effect
-        n = self.consec_growth()
+		self.resolve_transactions()
 
-        # more spectators likely to hoard in the more consecutive price hikes
-        self.population += [Speculator() for _ in range(random.randint(0, n**2))]
+	def new_agents(self):
+		'''
+		new agents come into the blockchain
+		'''
+		# extract agents from the agent list
+		miner_count = 1 + int(np.abs(np.random.normal(3, 1)))
+		altruist_count = np.abs(int(np.random.normal(10, 2)))
 
-    @property
-    def block_reward(self):
-        ''' block reward steadily decreases '''
-        return 100.0 / (self.curr_step**0.1)
+		n = self.consec_growth()
+		speculator_count = random.randint(0, n**2)
 
-    def consec_growth(self):
-        ''' count number of consecutive price hikes starting from latest price'''
+		self.miners += self.available_miners[:miner_count]
+		self.population += self.available_altruists[:altruist_count]
+		self.population += self.available_speculators[:speculator_count]
+		self.available_miners = self.available_miners[miner_count:]
+		self.available_altruists = self.available_altruists[altruist_count:]
+		self.available_speculators = self.available_speculators[speculator_count:]
 
-        if not self.hoard:
-            # if not hoarding, spectators enter uniformly random
-            return 4
+		# # new miners
+		# self.miners += [Miner() for _ in range(1 + int(np.abs(np.random.normal(3, 1))))]
+		#
+		# # altruists
+		# self.population += [Altruist() for _ in range(np.abs(int(np.random.normal(10, 2))))]
+		#
+		# # use consecutive price hikes to account for hoarding effect
+		# n = self.consec_growth()
+		#
+		# # more spectators likely to hoard in the more consecutive price hikes
+		# self.population += [Speculator() for _ in range(random.randint(0, n**2))]
 
-        c = 0
+	@property
+	def block_reward(self):
+		''' block reward steadily decreases '''
+		return 100.0 / (self.curr_step**0.1)
 
-        for i in reversed(range(1, len(self.p_hist))):
-            if self.p_hist[i] > self.p_hist[i - 1]:
-                c += 1
-            else:
-                break
-        return c
+	def consec_growth(self):
+		''' count number of consecutive price hikes starting from latest price'''
 
-    @property
-    def total_hashpow(self):
-        '''
-        :return: total mining power
-        '''
+		if not self.hoard:
+			# if not hoarding, spectators enter uniformly random
+			return 4
 
-        return sum([miner.hashpow for miner in self.miners])
+		c = 0
 
-    def plot_miners(self):
-        ''' plot miner proportion '''
-        thp = self.total_hashpow
-        pies = [miner.hashpow / thp for miner in self.miners]
-        pies.sort()
-        plt.pie(pies)
-        plt.show()
+		for i in reversed(range(1, len(self.p_hist))):
+			if self.p_hist[i] > self.p_hist[i - 1]:
+				c += 1
+			else:
+				break
+		return c
 
-    def plot_price(self):
-        ''' plot price history '''
-        plt.plot(self.p_hist, '-')
-        plt.show()
+	@property
+	def total_hashpow(self):
+		'''
+		:return: total mining power
+		'''
 
-    def mine(self):
-        '''
-        miners mine for blocks by randomly selecting winner based on proportional hashpower
-        '''
+		return sum([miner.hashpow for miner in self.miners])
 
-        # total hashpower
-        thp = self.total_hashpow
+	def plot_miners(self):
+		''' plot miner proportion '''
+		thp = self.total_hashpow
+		pies = [miner.hashpow / thp for miner in self.miners]
+		pies.sort()
+		plt.pie(pies)
+		plt.title("proportions of miner hash power")
+		plt.show()
 
-        # probablity of mining next block
-        probs = [miner.hashpow / thp for miner in self.miners]
+	def plot_price(self):
+		''' plot price history '''
+		plt.plot(self.p_hist, '-')
+		plt.title("price history")
+		plt.show()
 
-        # select winner
-        winner = np.random.choice(self.miners, p=probs)
+	def mine(self):
+		'''
+		miners mine for blocks by randomly selecting winner based on proportional hashpower
+		'''
 
-        # winner gains newly minted coins
-        winner.bitcoins += self.block_reward
+		# total hashpower
+		thp = self.total_hashpow
 
-    def get_transactions(self):
-        '''
-        adds transactions to the order lists
-        '''
+		# probablity of mining next block
+		probs = [miner.hashpow / thp for miner in self.miners]
 
-        # miners make transactions
-        for agent in self.miners:
+		# select winner
+		winner = np.random.choice(self.miners, p=probs)
 
-            if self.pool:
-                # decide whether to upgrade equipment
-                agent.assess_equipment()
+		# winner gains newly minted coins
+		winner.bitcoins += self.block_reward
 
-            b, p, q = agent.make_transactions(self.price)
+	def get_transactions(self):
+		'''
+		adds transactions to the order lists
+		'''
 
-            if b == 0:  # buy
-                # use bisect to insert into sorted list
-                bisect.insort(self.buy, (p, q, agent))
-            elif b == 1:  # sell
-                bisect.insort(self.sell, (p, q, agent))
+		# miners make transactions
+		for agent in self.miners:
 
-        # agents make transactions
-        for agent in self.population:
-            b, p, q = agent.make_transactions(self.price)
+			if self.pool:
+				# decide whether to upgrade equipment
+				agent.assess_equipment()
 
-            if b == 0: # buy
-                # use bisect to insert into sorted list
-                bisect.insort(self.buy, (p, q, agent))
-            elif b == 1: # sell
-                bisect.insort(self.sell, (p, q, agent))
+			b, p, q = agent.make_transactions(self.price)
 
-    def resolve_transactions(self):
-        '''
-        performs transactions by matching buy and sell orders
-        '''
+			if b == 0:  # buy
+				# use bisect to insert into sorted list
+				bisect.insort(self.buy, (p, q, agent))
+			elif b == 1:  # sell
+				bisect.insort(self.sell, (p, q, agent))
 
-        print(self.buy)
-        print(self.sell)
+		# agents make transactions
+		for agent in self.population:
+			b, p, q = agent.make_transactions(self.price)
 
-        # buy list is reversed
-        i = len(self.buy) - 1
+			if b == 0: # buy
+				# use bisect to insert into sorted list
+				bisect.insort(self.buy, (p, q, agent))
+			elif b == 1: # sell
+				bisect.insort(self.sell, (p, q, agent))
 
-        j = 0
+	def resolve_transactions(self):
+		'''
+		performs transactions by matching buy and sell orders
+		'''
 
-        transaction = False
+		print(self.buy)
+		print(self.sell)
 
-        while i >= 0 and j < len(self.sell):
-            p_b, q_b, buyer = self.buy[i]
-            p_s, q_s, seller = self.sell[j]
+		# buy list is reversed
+		i = len(self.buy) - 1
 
-            if p_b >= p_s: # hit! make transaction
+		j = 0
 
-                transaction = True
+		transaction = False
 
-                # use the lesser quantity
-                q_t = min(q_b, q_s)
-                q_b -= q_t
-                q_s -= q_t
+		while i >= 0 and j < len(self.sell):
+			p_b, q_b, buyer = self.buy[i]
+			p_s, q_s, seller = self.sell[j]
 
-                print("---transaction---")
-                print(buyer, '|||||', seller)
-                print(q_t, '    ', p_b)
+			if p_b >= p_s: # hit! make transaction
 
-                # update buyer and seller wallets
-                buyer.capital_to_coins(q_t, p_b)
-                seller.coins_to_capital(q_t, p_b)
+				transaction = True
 
-                print(buyer, '|||||', seller)
+				# use the lesser quantity
+				q_t = min(q_b, q_s)
+				q_b -= q_t
+				q_s -= q_t
 
-                if q_b == 0: # all bought, move on
-                    i -= 1
-                else: # update residual quantity
-                    self.buy[i] = (p_b, q_b, buyer)
+				print("---transaction---")
+				print(buyer, '|||||', seller)
+				print(q_t, '    ', p_b)
 
-                if q_s == 0: # all sold
-                    j += 1
-                else: # update residual quantity
-                    self.sell[j] = (p_s, q_s, seller)
+				# update buyer and seller wallets
+				buyer.capital_to_coins(q_t, p_b)
+				seller.coins_to_capital(q_t, p_b)
 
-                # maximum transaction price right now
-                self.price = p_b
+				print(buyer, '|||||', seller)
 
-            else: # no hits left, go to next time step
+				if q_b == 0: # all bought, move on
+					i -= 1
+				else: # update residual quantity
+					self.buy[i] = (p_b, q_b, buyer)
 
-                # market crashing...
-                if not transaction:
-                    self.price = p_s
+				if q_s == 0: # all sold
+					j += 1
+				else: # update residual quantity
+					self.sell[j] = (p_s, q_s, seller)
 
-                break
+				# maximum transaction price right now
+				self.price = p_b
 
-        # update order lists
-        self.buy = []#self.buy[i:]
-        self.sell = []#self.sell[j:]
-        self.p_hist.append(self.price)
-        print('\n', self.curr_step, ") Price: ", self.price, "\n")
+			else: # no hits left, go to next time step
+
+				# market crashing...
+				if not transaction:
+					self.price = p_s
+
+				break
+
+		# update order lists
+		self.buy = []#self.buy[i:]
+		self.sell = []#self.sell[j:]
+		self.p_hist.append(self.price)
+		print('\n', self.curr_step, ") Price: ", self.price, "\n")
 
 
 x = Blockchain()
 x.run()
 x.plot_miners()
 x.plot_price()
-
-
-
