@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from Agent import Altruist, Miner, Speculator
 
-TIMESTEPS = 300
+TIMESTEPS = 1000
 
 class Blockchain():
 	''' performs a simulation of a blockchain economy '''
@@ -301,6 +301,37 @@ class Blockchain():
 		plt.title("price history")
 		plt.show()
 
+	def wealth_dist_post(self):
+		'''plot wealth distribution after the simulation, by agent type'''
+		# wealth = capital + bitcoin in usd
+		last_price = self.p_hist[-1]
+
+		altruist_wealth = [alt.capital_current + alt.bitcoins * last_price for alt in self.altruists]
+		miner_wealth = [m.capital_current + m.bitcoins * last_price for m in self.miners]
+		speculator_wealth = [spec.capital_current + spec.bitcoins + last_price for spec in self.speculators]
+
+		total_altruist = sum(altruist_wealth)
+		total_miner = sum(miner_wealth)
+		total_speculator = sum(speculator_wealth)
+		total = {"user": total_altruist, "miner": total_miner, "speculator": total_speculator}
+		total = dict(sorted(total.items(), key=lambda x:x[1]))
+		plt.pie(list(total.values()), labels=list(total.keys()) )
+		plt.title("wealth distribution post simulation")
+		plt.show()
+
+		plt.hist(miner_wealth)
+		plt.title("wealth distribution of miners")
+		plt.show()
+
+		plt.hist(altruist_wealth)
+		plt.title("wealth distribution of users")
+		plt.show()
+
+		plt.hist(speculator_wealth)
+		plt.title("wealth distribution of speculators")
+		plt.show()
+
+
 	def num_agents_over_time(self):
 		X = range(TIMESTEPS)
 		plt.plot(X, self.altruist_counts, label="users")
@@ -318,7 +349,14 @@ class Blockchain():
 		self.price_history()
 		self.hash_power_proportions()
 		self.num_agents_over_time()
+		self.wealth_dist_post()
 
 chain = Blockchain()
 chain.run()
 chain.plots()
+
+# # run many simulations
+# num_simulations = 100
+# for _ in range(num_simulations):
+# 	chain = Blockchain()
+# 	chain.p_hist
