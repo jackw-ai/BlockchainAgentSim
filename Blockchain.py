@@ -1,4 +1,5 @@
 import bisect, random
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,9 +57,12 @@ class Blockchain():
 		# pareto wealth distribution; decide on param
 		capitals = np.random.pareto(3, total) * 10000
 
-		self.available_miners = [Miner(capitals[i]) for i in range(num_miners)]
-		self.available_altruists = [Altruist(capitals[j]) for j in range(num_miners, num_altruists + num_miners)]
-		self.available_speculators = [Speculator(capitals[k]) for k in range(num_altruists + num_miners, total)]
+		# self.available_miners = [Miner(capitals[i]) for i in range(num_miners)]
+		# self.available_altruists = [Altruist(capitals[j]) for j in range(num_miners, num_altruists + num_miners)]
+		# self.available_speculators = [Speculator(capitals[k]) for k in range(num_altruists + num_miners, total)]
+		self.available_miners = capitals[:num_miners]
+		self.available_altruists = capitals[num_miners: num_altruists + num_miners]
+		self.available_speculators = capitals[num_altruists + num_miners: total]
 
 	def run(self, timesteps = TIMESTEPS):
 		'''
@@ -66,7 +70,7 @@ class Blockchain():
 		'''
 		self.generate_agents()
 
-		print('starting simulation for %d timesteps...' %timesteps)
+		# print('starting simulation for %d timesteps...' %timesteps)
 
 		for i in range(timesteps):
 			self.step()
@@ -114,15 +118,19 @@ class Blockchain():
 		n = self.consec_growth()
 		speculator_count = random.randint(0, n**2)
 
-		# extract agents from the agent list
-		self.miners += self.available_miners[:miner_count]
-		self.altruists += self.available_altruists[:altruist_count]
-		self.speculators += self.available_speculators[:speculator_count]
+		# # extract agents from the agent list
+		# self.miners += self.available_miners[:miner_count]
+		self.miners += [Miner(cap) for cap in self.available_miners[:miner_count]]
+		# self.altruists += self.available_altruists[:altruist_count]
+		self.altruists += [Altruist(cap) for cap in self.available_altruists[:altruist_count]]
+		# self.speculators += self.available_speculators[:speculator_count]
+		self.speculators += [Speculator(cap) for cap in self.available_speculators[:speculator_count]]
+
 		self.available_miners = self.available_miners[miner_count:]
 		self.available_altruists = self.available_altruists[altruist_count:]
 		self.available_speculators = self.available_speculators[speculator_count:]
 
-		# record number of agents currently in the simulation
+		# record number of agents currently in the simulation (at each step)
 		if self.curr_step == 1:
 			self.altruist_counts.append(altruist_count)
 			self.miner_counts.append(miner_count)
@@ -248,15 +256,15 @@ class Blockchain():
 				q_b -= q_t
 				q_s -= q_t
 
-				print("---transaction---")
-				print(buyer, '|||||', seller)
-				print(q_t, '    ', p_b)
+				# print("---transaction---")
+				# print(buyer, '|||||', seller)
+				# print(q_t, '    ', p_b)
 
 				# update buyer and seller wallets
 				buyer.capital_to_coins(q_t, p_b)
 				seller.coins_to_capital(q_t, p_b)
 
-				print(buyer, '|||||', seller)
+				# print(buyer, '|||||', seller)
 
 				if q_b == 0: # all bought, move on
 					i -= 1
@@ -283,23 +291,12 @@ class Blockchain():
 		self.buy = []#self.buy[i:]
 		self.sell = []#self.sell[j:]
 		self.p_hist.append(self.price)
-		print('\n', self.curr_step, ") Price: ", self.price, "\n")
+		# print('\n', self.curr_step, ") Price: ", self.price, "\n")
 
 	def hash_power_proportions(self):
-		''' plot miner proportion '''
 		thp = self.total_hashpow
-		pies = [miner.hashpow / thp for miner in self.miners]
-		pies.sort()
-		plt.pie(pies)
-		plt.title("proportions of miner hash power")
-		plt.show()
-
-	def price_history(self):
-		''' plot price history '''
-		plt.plot(self.p_hist, '-')
-		plt.xlabel("time steps"); plt.ylabel("price")
-		plt.title("price history")
-		plt.show()
+		prop = [miner.hashpow / thp for miner in self.miners]
+		return sorted(prop, reverse = True)
 
 	def wealth_dist_post(self):
 		'''plot wealth distribution after the simulation, by agent type'''
@@ -313,24 +310,19 @@ class Blockchain():
 		total_altruist = sum(altruist_wealth)
 		total_miner = sum(miner_wealth)
 		total_speculator = sum(speculator_wealth)
-		total = {"user": total_altruist, "miner": total_miner, "speculator": total_speculator}
-		total = dict(sorted(total.items(), key=lambda x:x[1]))
-		plt.pie(list(total.values()), labels=list(total.keys()) )
-		plt.title("wealth distribution post simulation")
-		plt.show()
+		return [total_altruist, total_miner, total_speculator]
 
-		plt.hist(miner_wealth)
-		plt.title("wealth distribution of miners")
-		plt.show()
-
-		plt.hist(altruist_wealth)
-		plt.title("wealth distribution of users")
-		plt.show()
-
-		plt.hist(speculator_wealth)
-		plt.title("wealth distribution of speculators")
-		plt.show()
-
+		# plt.hist(miner_wealth)
+		# plt.title("wealth distribution of miners")
+		# plt.show()
+		#
+		# plt.hist(altruist_wealth)
+		# plt.title("wealth distribution of users")
+		# plt.show()
+		#
+		# plt.hist(speculator_wealth)
+		# plt.title("wealth distribution of speculators")
+		# plt.show()
 
 	def num_agents_over_time(self):
 		X = range(TIMESTEPS)
@@ -346,17 +338,38 @@ class Blockchain():
 
 	# call all plotting here, comment out ones not needed
 	def plots(self):
-		self.price_history()
-		self.hash_power_proportions()
-		self.num_agents_over_time()
-		self.wealth_dist_post()
+		plot_price_history(self.p_hist)
+		plot_hash_power_prop(self.hash_power_proportions())
+		plot_wealth_dist(self.wealth_dist_post())
+		# self.num_agents_over_time()
 
-chain = Blockchain()
-chain.run()
-chain.plots()
+# chain = Blockchain()
+# chain.run()
+# chain.plots()
 
-# # run many simulations
-# num_simulations = 100
-# for _ in range(num_simulations):
-# 	chain = Blockchain()
-# 	chain.p_hist
+def simulate(runs=100):
+	price_hist = np.empty(runs, dtype=object)
+	hash_power = np.empty(runs, dtype=object)
+	wealth_dist = np.empty(runs, dtype=object)
+	for i in range(0, runs):
+		print("simulation count: %d \n" % (i+1))
+
+		chain = Blockchain()
+		chain.run()
+		# price_hist.append(np.array(chain.p_hist))
+		# hash_power.append(np.array(chain.hash_power_proportions()))
+		# wealth_dist.append(np.array(chain.wealth_dist_post()))
+		price_hist[i] = np.array(chain.p_hist)
+		hash_power[i] = np.array(chain.hash_power_proportions())
+		wealth_dist[i] = np.array(chain.wealth_dist_post())
+
+		# np.vstack((price_hist, chain.p_hist))
+		# np.vstack((hash_power, chain.hash_power_proportions()))
+		# np.vstack((wealth_dist, chain.wealth_dist_post()))
+
+	# save data
+	np.save("price_hist", price_hist)
+	np.save("hash_power", hash_power)
+	np.save("wealth_dist", wealth_dist)
+
+simulate(100)

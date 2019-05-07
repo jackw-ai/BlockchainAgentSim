@@ -16,7 +16,7 @@ class Agent(ABC):
 		# wealth follows a lognormal (right skewed) distribution
 		# self.capital = np.random.lognormal(1, 2) * 10000 #random.randint(1000, 1000000)
 		self.bitcoins = 0
-		self.loss_tolerance = 0.2 # original capital/current capital >= 1-loss_tolerance
+		self.loss_tolerance = 0.1 # original capital/current capital >= 1-loss_tolerance
 
 	@abstractmethod
 	def make_transactions(self, price):
@@ -51,6 +51,8 @@ class Altruist(Agent):
 
 	def __init__(self, capital):
 		super().__init__()
+
+		# self.loss_tolerance = 0.05
 
 		self.capital_original = capital
 		self.capital_current = capital
@@ -193,6 +195,8 @@ class Speculator(Agent):
 
 	def __init__(self, capital):
 		super().__init__()
+
+		self.loss_tolerance = 0.25
 
 		self.capital_original = capital
 		self.capital_current = capital
